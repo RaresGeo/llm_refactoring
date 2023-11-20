@@ -42,7 +42,19 @@ def refactor_code(code, extra_prompt, language, openai_client, get_response):
 
 
 def get_response(response):
-        return response.choices[0].message.content
+    # Regular expression pattern to match the code block
+    code_block_pattern = re.compile(r"```(.*?)\n(.*?)```", re.DOTALL)
+    match = code_block_pattern.search(response)
+    
+    if match:
+        language = match.group(1).strip()
+        code = match.group(2).strip()
+        extension = language if language else "txt"
+    else:
+        code = response
+        extension = "txt"
+    
+    return code, extension
     
 load_dotenv()
 
@@ -83,12 +95,13 @@ if __name__ == '__main__':
         
     start_time = time.time()
     print(f'Refactoring code in...')
-    response = refactor_code(code, extra_prompt, language, client, get_response)
+    refactored_code, extension = refactor_code(code, extra_prompt, language, client, get_response)
     
-    extension = {
-        'python': '.py',
-        'go': '.go'
-    }.get(language, '.txt')
+    if extension != 'txt':
+        extension = {
+            'python': 'py',
+            'go': 'go'
+        }.get(language, extension)
 
     # Create subdirectory for the current day
     current_date = time.strftime("%d_%m_%Y")
@@ -97,10 +110,10 @@ if __name__ == '__main__':
 
     # Generate the output file name without the date
     file_id = get_next_id(day_output_dir, extension)
-    output_file_name = f'{file_id}_output{extension}'
+    output_file_name = f'{file_id}_output.{extension}'
 
     with open(os.path.join(day_output_dir, output_file_name), 'w') as f:
-        f.write(response)
+        f.write(refactored_code)
         elapsed_time = time.time() - start_time
         minutes = int(elapsed_time // 60)
         seconds = elapsed_time % 60
