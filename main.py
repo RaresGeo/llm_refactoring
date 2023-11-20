@@ -1,4 +1,5 @@
 import os
+import re
 import sys
 from openai import OpenAI
 from prompts import generate_refactor_code_prompt
@@ -43,8 +44,9 @@ def refactor_code(code, extra_prompt, language, openai_client, get_response):
 
 def get_response(response):
     # Regular expression pattern to match the code block
+    answer = response.choices[0].message.content
     code_block_pattern = re.compile(r"```(.*?)\n(.*?)```", re.DOTALL)
-    match = code_block_pattern.search(response)
+    match = code_block_pattern.search(answer)
     
     if match:
         language = match.group(1).strip()

@@ -1,75 +1,356 @@
-def refactor_code(code, extra_prompt, language, openai_client, get_response):
-    match language:
-        case 'go':
-            role_content = refactor_go
-        case _:
-            role_content = refactor_general
-            
-    refactor_code_prompt = generate_refactor_code_prompt(code, extra_prompt)
-    
-    user_prompt = {"role": "user", "content": refactor_code_prompt}
-    
-    return query_llm(role_content, [user_prompt], openai_client, get_response)
-
-
-def get_response(response):
-        return response.choices[0].message.content
-    
-load_dotenv()
-
-import os
-import time
-import sys
-
-def get_next_id(output_dir, current_date, extension):
-    """Get the next ID for the output file, based on date and extension."""
-    existing_files = os.listdir(output_dir)
-    max_id = -1
-    for file in existing_files:
-        if file.endswith(extension) and file.startswith(current_date):
-            parts = file.split('_')
-            if len(parts) > 1 and parts[1].isdigit():
-                max_id = max(max_id, int(parts[1]))
-    return max_id + 1
-
-if __name__ == '__main__':
-    client = OpenAI(api_key=os.environ.get('OPENAI_API_KEY'))
-
-    input_dir = 'input'
-    output_dir = 'output'
-    os.makedirs(output_dir, exist_ok=True)
-    
-    if len(sys.argv) > 1:
-        language = sys.argv[1]
-    else:
-        language = ""
-
-    with open(os.path.join(input_dir, 'code_input.txt')) as f:
-        code = f.read()
-        
-    with open(os.path.join(input_dir, 'extra_prompt.txt')) as f:
-        extra_prompt = f.read()
-        
-    start_time = time.time()
-    print(f'Refactoring code in {language}...')
-    response = refactor_code(code, extra_prompt, 'go', client, get_response)
-    
-    extension = {
-        'python': '.py',
-        'go': '.go'
-    }.get(language, '.txt')
-
-    # Generate the output file name
-    current_date = time.strftime("%d_%m_%Y")
-    file_id = get_next_id(output_dir, current_date, extension)
-    output_file_name = f'{current_date}_{file_id}_output{extension}'
-
-    with open(os.path.join(output_dir, output_file_name), 'w') as f:
-        f.write(response)
-        elapsed_time = time.time() - start_time
-        minutes = int(elapsed_time // 60)
-        seconds = elapsed_time % 60
-        print(f'Wrote output to {output_file_name} in {minutes} minutes and {seconds:.2f} seconds')
-
-
-        
+openapi: 3.1.0
+info:
+  title: Audit Service
+  version: '1.0'
+  summary: Service for auditing smart contracts
+  description: Service for auditing smart contracts
+servers:
+  - url: 'http://localhost:8080'
+paths:
+  '/mythril/module/{moduleTemplateID}/{version}':
+    post:
+      operationId: startMythrilAnalysisForVersion
+      summary: Initiates an audit for a given module template and version
+      parameters:
+        - name: moduleTemplateID
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: version
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '202':
+          description: Audit initiated
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: "Started analysis"
+        '409':
+          description: Audit already in progress
+          content:
+            text/plain:
+            schema:
+              type: string
+              example: "Analysis already started"
+    get:
+      operationId: fetchMythrilAnalysisForVersion
+      summary: Fetches the audit analysis for a given module template and version
+      parameters:
+        - name: moduleTemplateID
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: version
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Audit analysis data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  startedAt:
+                    type: string
+                    example: "2023-01-01T00:00:00Z"
+                  expectedAt:
+                    type: string
+                    example: "2023-01-01T00:05:00Z"
+                  analysis:
+                    type: string
+                    example: "Analysis output..."
+        '404':
+          description: Audit not found
+          content:
+            text/plain:
+            schema:
+              type: object
+              properties:
+                startedAt:
+                  type: string
+                  example: ""
+                expectedAt:
+                  type: string
+                  example: ""
+                analysis:
+                  type: string
+                  example: ""
+  '/mythril/bytecode/bytecode/{contractAddress}/{chainId}':
+    post:
+      operationId: StartMythrilAnalysisForContract
+      summary: Initiates a Mythril analysis for a given contract bytecode
+      parameters:
+        - name: contractAddress
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: chainId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                bytecode:
+                  type: string
+      responses:
+        '202':
+          description: Analysis initiated
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: "Started analysis"
+        '409':
+            description: Analysis already in progress
+            content:
+                text/plain:
+                schema:
+                type: string
+                example: "Analysis already started"
+    get:
+      operationId: FetchMythrilAnalysisForContract
+      summary: Fetches the Mythril analysis results for a given contract bytecode
+      parameters:
+        - name: contractAddress
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: chainId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Analysis data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  startedAt:
+                    type: string
+                    example: "2023-01-01T00:00:00Z"
+                  expectedAt:
+                    type: string
+                    example: "2023-01-01T00:05:00Z"
+                  analysis:
+                    type: string
+                    example: "Analysis output..."
+        '404':
+            description: Analysis not found
+            content:
+                text/plain:
+                schema:
+                type: object
+                properties:
+                    startedAt:
+                      type: string
+                      example: ""
+                    expectedAt:
+                      type: string
+                      example: ""
+                    analysis:
+                      type: string
+                      example: ""
+  /slither/analyze/{contractAddress}/{chainId}:
+    post:
+      operationId: StartSlitherAnalysisForContract
+      summary: Initiates a Slither analysis for a given contract
+      parameters:
+        - name: contractAddress
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: chainId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                solidityVersion:
+                  type: string
+                files:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      name:
+                        type: string
+                      path:
+                        type: string
+                      content:
+                        type: string
+                    required:
+                      - name
+                      - path
+                      - content
+                rootContractPath:
+                  type: string
+      description: The smart contract files, the root contract path, and the Solidity version
+      responses:
+        '202':
+          description: Analysis initiated
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: "Started analysis"
+        '409':
+          description: Analysis already in progress
+          content:
+            text/plain:
+            schema:
+            type: string
+            example: "Analysis already started"
+    get:
+        operationId: FetchSlitherAnalysisForContract
+        summary: Fetches the Slither analysis results for a given contract
+        parameters:
+            - name: contractAddress
+              in: path
+              required: true
+              schema:
+                  type: string
+            - name: chainId
+              in: path
+              required: true
+              schema:
+                  type: string
+        responses:
+          '200':
+            description: Analysis data
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    startedAt:
+                      type: string
+                      example: "2023-01-01T00:00:00Z"
+                    expectedAt:
+                      type: string
+                      example: "2023-01-01T00:05:00Z"
+                    analysis:
+                      type: string
+                      example: "Analysis output..."
+          '404':
+            description: Analysis not found
+            content:
+              text/plain:
+              schema:
+              type: object
+              properties:
+                startedAt:
+                  type: string
+                  example: ""
+                expectedAt:
+                  type: string
+                  example: ""
+                analysis:
+                  type: string
+                  example: ""
+  /llm/{contractAddress}/{chainId}:
+    post:
+      operationId: StartSummaryViaLLM
+      summary: Summarizes the contract details using LLM
+      parameters:
+        - name: contractAddress
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: chainId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+      description: Requires the contract address and chain ID as parameters in the URL
+      responses:
+        '202':
+            description: Analysis initiated
+            content:
+                text/plain:
+                schema:
+                    type: string
+                    example: "Started analysis"
+        '409':
+            description: Analysis already in progress
+            content:
+                text/plain:
+                schema:
+                    type: string
+                    example: "Analysis already started"
+    get:
+        operationId: FetchSummaryViaLLM
+        summary: Fetches the LLM analysis results for a given contract
+        parameters:
+            - name: contractAddress
+              in: path
+              required: true
+              schema:
+                type: string
+            - name: chainId
+              in: path
+              required: true
+              schema:
+                type: string
+        responses:
+          '200':
+            description: Analysis data
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    startedAt:
+                      type: string
+                      example: "2023-01-01T00:00:00Z"
+                    expectedAt:
+                      type: string
+                      example: "2023-01-01T00:05:00Z"
+                    analysis:
+                      type: string
+                      example: "Analysis output..."
+          '404':
+            description: Analysis not found
+            content:
+              text/plain:
+              schema:
+              type: object
+              properties:
+                startedAt:
+                  type: string
+                  example: ""
+                expectedAt:
+                  type: string
+                  example: ""
+                analysis:
+                  type: string
+                  example: ""
