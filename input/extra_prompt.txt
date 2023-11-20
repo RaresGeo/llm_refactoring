@@ -1,0 +1,1 @@
+Change the code to create subdirectories for each day, then remove the date from the name of the file itself.
